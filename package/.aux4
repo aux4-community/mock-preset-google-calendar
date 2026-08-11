@@ -1,0 +1,151 @@
+{
+  "scope": "community",
+  "name": "mock-preset-google-calendar",
+  "version": "0.0.1",
+  "description": "Google Calendar preset for aux4/mock (calendar list, events CRUD, quickAdd, freeBusy)",
+  "license": "Apache-2.0",
+  "tags": [
+    "aux4",
+    "mock",
+    "preset",
+    "google",
+    "calendar",
+    "test"
+  ],
+  "dependencies": [
+    "aux4/mock",
+    "community/mock-preset-google-auth"
+  ],
+  "profiles": [
+    {
+      "name": "main",
+      "commands": [
+        {
+          "name": "mock",
+          "execute": [
+            "profile:mock"
+          ],
+          "help": {
+            "text": "Programmable HTTP mock server for tests"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mock",
+      "commands": [
+        {
+          "name": "preset",
+          "execute": [
+            "profile:mock:preset"
+          ],
+          "help": {
+            "text": "Apply a service preset to a running mock. Presets are installable packages (community/mock-preset-<service>) that add commands here."
+          }
+        }
+      ]
+    },
+    {
+      "name": "mock:preset",
+      "commands": [
+        {
+          "name": "google",
+          "execute": [
+            "profile:mock:preset:google"
+          ],
+          "help": {
+            "text": "Google presets. `auth` stands up the credentials every Google API needs; the per-service presets (community/mock-preset-google-<service>) add their endpoints here."
+          }
+        }
+      ]
+    },
+    {
+      "name": "mock:preset:google",
+      "commands": [
+        {
+          "name": "calendar",
+          "execute": [
+            "aux4 mock stub param(port) param(name) param(stateDir) --method GET --path /users/me/calendarList --status 200 --body value(calendarListBody)",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method GET --path '/calendars/{calendarId}/events' --status 200 --body value(eventsBody)",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path '/calendars/{calendarId}/events' --status 200 --body value(eventBody)",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path '/calendars/{calendarId}/events/quickAdd' --status 200 --body value(eventBody)",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method GET --path '/calendars/{calendarId}/events/{eventId}' --status 200 --body value(eventBody)",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method PATCH --path '/calendars/{calendarId}/events/{eventId}' --status 200 --body value(eventBody)",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method DELETE --path '/calendars/{calendarId}/events/{eventId}' --status 204 --body '{}'",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path /freeBusy --status 200 --body value(freeBusyBody)"
+          ],
+          "help": {
+            "text": "Register the Google Calendar API on a running mock: calendarList, the events collection and item (GET/POST/PATCH/DELETE), quickAdd, and freeBusy. Run `mock preset google auth` first for credentials",
+            "variables": [
+              {
+                "name": "port",
+                "text": "Port of the running mock server (derives stateDir)",
+                "default": "7070"
+              },
+              {
+                "name": "name",
+                "text": "Stable handle of the server (derives stateDir; takes precedence over --port)",
+                "default": ""
+              },
+              {
+                "name": "stateDir",
+                "text": "Explicit state directory (highest precedence)",
+                "default": ""
+              },
+              {
+                "name": "calendar",
+                "text": "Summary (display name) of the calendar returned by calendarList",
+                "default": "Sally"
+              },
+              {
+                "name": "calendarId",
+                "text": "Calendar id returned by calendarList. Paths match any calendar id regardless of this value",
+                "default": "primary"
+              },
+              {
+                "name": "eventId",
+                "text": "Id of the event returned by the event endpoints",
+                "default": "evt1"
+              },
+              {
+                "name": "event",
+                "text": "Summary (title) of the event returned by the event endpoints",
+                "default": "Team sync"
+              },
+              {
+                "name": "start",
+                "text": "Start time of the returned event, RFC3339",
+                "default": "2026-01-15T09:00:00Z"
+              },
+              {
+                "name": "end",
+                "text": "End time of the returned event, RFC3339",
+                "default": "2026-01-15T10:00:00Z"
+              },
+              {
+                "name": "calendarListBody",
+                "text": "calendarList response body (derived from --calendar/--calendarId)",
+                "default": "{\"kind\":\"calendar#calendarList\",\"items\":[{\"kind\":\"calendar#calendarListEntry\",\"id\":\"${calendarId}\",\"summary\":\"${calendar}\",\"primary\":true,\"accessRole\":\"owner\"}]}"
+              },
+              {
+                "name": "eventBody",
+                "text": "Single event body, returned by get/create/update/quickAdd (derived from --eventId/--event/--start/--end)",
+                "default": "{\"kind\":\"calendar#event\",\"id\":\"${eventId}\",\"status\":\"confirmed\",\"summary\":\"${event}\",\"start\":{\"dateTime\":\"${start}\"},\"end\":{\"dateTime\":\"${end}\"}}"
+              },
+              {
+                "name": "eventsBody",
+                "text": "Events list body (derived from the event flags)",
+                "default": "{\"kind\":\"calendar#events\",\"summary\":\"${calendar}\",\"items\":[{\"kind\":\"calendar#event\",\"id\":\"${eventId}\",\"status\":\"confirmed\",\"summary\":\"${event}\",\"start\":{\"dateTime\":\"${start}\"},\"end\":{\"dateTime\":\"${end}\"}}]}"
+              },
+              {
+                "name": "freeBusyBody",
+                "text": "freeBusy response body (derived from --calendarId/--start/--end)",
+                "default": "{\"kind\":\"calendar#freeBusy\",\"calendars\":{\"${calendarId}\":{\"busy\":[{\"start\":\"${start}\",\"end\":\"${end}\"}]}}}"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
