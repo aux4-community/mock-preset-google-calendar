@@ -16,6 +16,17 @@ the field you need, pass the whole body instead with `--calendarListBody`, `--ev
 The preset is a base layer. Apply it, then call `aux4 mock stub` for any endpoint you want to
 behave differently — a later stub for the same method and path replaces the preset's.
 
+#### Stateful effects
+
+The create/update/delete endpoints reprogram the GET endpoints when they serve a response (using
+`aux4/mock`'s `--thenFile`), so a later read observes the effect of the earlier action: `DELETE`
+makes a later `GET` of that event 404 (Google's error envelope) and drops it from the events list;
+`PATCH` makes a later `GET` of that event and the list reflect the `summary`/`start`/`end` the
+request sent (a field the request didn't send resolves to an empty string); `POST` create makes a
+later `GET` by the fixed `--eventId` return the created event's fields. This is single-fixture
+state — there is always exactly one event, toggled between present and absent/updated, not an
+arbitrary collection. Requires `aux4/mock` 0.1.0 or later.
+
 #### Usage
 
 ```bash

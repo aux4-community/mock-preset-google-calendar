@@ -13,7 +13,8 @@ aux4 aux4 pkger install community/mock-preset-google-calendar
 ```
 
 Installing pulls in `community/mock-preset-google-auth`, which supplies the credentials every
-Google API call needs.
+Google API call needs. Requires `aux4/mock` 0.1.0 or later (for the stateful-effects `--thenFile`
+flag used by this preset's create/update/delete endpoints).
 
 ## Usage
 
@@ -51,6 +52,38 @@ aux4 google calendar events list --tokenFile google-token.json --apiUrl http://1
 
 The paths are templates: any calendar id and any event id match, whatever `--calendarId` and
 `--eventId` are set to. Those flags control what the **bodies** say.
+
+### Stateful effects: GET reflects an earlier create/update/delete
+
+The preset now wires each mutating endpoint to reprogram the GET endpoints when it serves a
+response (via [`aux4/mock`'s `--thenFile`](https://hub.aux4.io/r/public/packages/aux4/mock)), so a
+test that acts and then reads back sees the effect of the action instead of the original fixture:
+
+- **`DELETE`** the event -> a later `GET` of that event returns Google's `404 Not Found` envelope,
+  and the events list no longer includes it.
+- **`PATCH`** the event -> a later `GET` of that event, and the events list, reflect the
+  `summary`/`start`/`end` the `PATCH` request sent. A field the request didn't send resolves to an
+  empty string — send the fields you want reflected (a reschedule typically sends `start` and
+  `end`).
+- **`POST`** create -> a later `GET` by the fixed `--eventId` returns the created event's
+  `summary`/`start`/`end`.
+
+```bash
+aux4 mock preset google calendar --port 18901
+
+curl -s http://localhost:18901/api/calendars/primary/events/evt1
+# {"kind":"calendar#event","id":"evt1","summary":"Team sync", ...}
+
+curl -s -X DELETE http://localhost:18901/api/calendars/primary/events/evt1
+
+curl -s -w "\n%{http_code}" http://localhost:18901/api/calendars/primary/events/evt1
+# {"error":{"errors":[{"domain":"global","reason":"notFound","message":"Not Found"}],"code":404,"message":"Not Found"}}
+# 404
+```
+
+This is single-fixture state: the mock always starts with exactly one event (`--eventId`), so the
+events list toggles between that one item and empty — it does not track an arbitrary number of
+created events.
 
 ### Shaping the responses
 
