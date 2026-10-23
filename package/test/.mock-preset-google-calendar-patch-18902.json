@@ -1,0 +1,1 @@
+{"kind":"calendar#event","id":"${path.eventId}","status":"confirmed","summary":"${body.summary:-Team sync}","start":{"dateTime":"${body.start.dateTime:-2026-01-15T09:00:00Z}"},"end":{"dateTime":"${body.end.dateTime:-2026-01-15T10:00:00Z}"}}

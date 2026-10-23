@@ -72,7 +72,8 @@
             "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path '/calendars/{calendarId}/events/quickAdd' --status 200 --body value(eventBody)",
             "aux4 mock stub param(port) param(name) param(stateDir) --method GET --path '/calendars/{calendarId}/events/{eventId}' --status 200 --body value(eventBody)",
             "file:${thenFile}:${patchThenBody}",
-            "aux4 mock stub param(port) param(name) param(stateDir) --method PATCH --path '/calendars/{calendarId}/events/{eventId}' --status 200 --body value(eventBody) --thenFile ${thenFile}",
+            "file:${patchBodyFile}:${patchResponseBody}",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method PATCH --path '/calendars/{calendarId}/events/{eventId}' --status 200 --bodyFile ${patchBodyFile} --thenFile ${thenFile}",
             "file:${thenFile}:${deleteThenBody}",
             "aux4 mock stub param(port) param(name) param(stateDir) --method DELETE --path '/calendars/{calendarId}/events/{eventId}' --status 204 --body '{}' --thenFile ${thenFile}",
             "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path /freeBusy --status 200 --body value(freeBusyBody)",
@@ -158,13 +159,23 @@
               },
               {
                 "name": "patchThenBody",
-                "text": "aux4/mock --then for an update: makes a later GET of that event (and the list) reflect the patched start/end/summary. A field the PATCH did not send resolves to an empty string",
-                "default": "[{\"method\":\"GET\",\"path\":\"/calendars/${path.calendarId}/events/${path.eventId}\",\"status\":200,\"body\":\"{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${path.eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime}\\\"}}\"},{\"method\":\"GET\",\"path\":\"/calendars/${path.calendarId}/events\",\"status\":200,\"body\":\"{\\\"kind\\\":\\\"calendar#events\\\",\\\"summary\\\":\\\"${calendar}\\\",\\\"items\\\":[{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${path.eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime}\\\"}}]}\"}]"
+                "text": "aux4/mock --then for an update: makes a later GET of that event (and the list) reflect the patched start/end/summary. A field the PATCH did not send keeps its preset value (via the mock's ${body.x:-default} fallback)",
+                "default": "[{\"method\": \"GET\", \"path\": \"/calendars/${path.calendarId}/events/${path.eventId}\", \"status\": 200, \"body\": \"{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${path.eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary:-${event}}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime:-${start}}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime:-${end}}\\\"}}\"}, {\"method\": \"GET\", \"path\": \"/calendars/${path.calendarId}/events\", \"status\": 200, \"body\": \"{\\\"kind\\\":\\\"calendar#events\\\",\\\"summary\\\":\\\"${calendar}\\\",\\\"items\\\":[{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${path.eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary:-${event}}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime:-${start}}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime:-${end}}\\\"}}]}\"}]"
               },
               {
                 "name": "createThenBody",
                 "text": "aux4/mock --then for a create: makes a later GET by the fixed --eventId return the created event's summary/start/end. A field the create request did not send resolves to an empty string",
                 "default": "[{\"method\":\"GET\",\"path\":\"/calendars/${path.calendarId}/events/${eventId}\",\"status\":200,\"body\":\"{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime}\\\"}}\"}]"
+              },
+              {
+                "name": "patchResponseBody",
+                "text": "Body returned by PATCH/PUT of an event: the event with the sent fields applied (fields not sent keep their preset values).",
+                "default": "{\"kind\":\"calendar#event\",\"id\":\"${path.eventId}\",\"status\":\"confirmed\",\"summary\":\"${body.summary:-${event}}\",\"start\":{\"dateTime\":\"${body.start.dateTime:-${start}}\"},\"end\":{\"dateTime\":\"${body.end.dateTime:-${end}}\"}}"
+              },
+              {
+                "name": "patchBodyFile",
+                "text": "Scratch file the PATCH response template is written to.",
+                "default": ".mock-preset-google-calendar-patch-${port}${name}.json"
               }
             ]
           }
