@@ -5,3 +5,6 @@ local-test
 **/.DS_Store
 **/*.zip
 package/test/.tmp
+
+# runtime scratch files written by the preset
+**/.mock-preset-*.json

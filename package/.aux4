@@ -1,7 +1,7 @@
 {
   "scope": "community",
   "name": "mock-preset-google-calendar",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Google Calendar preset for aux4/mock (calendar list, events CRUD, quickAdd, freeBusy)",
   "license": "Apache-2.0",
   "tags": [
@@ -77,7 +77,8 @@
             "file:${thenFile}:${deleteThenBody}",
             "aux4 mock stub param(port) param(name) param(stateDir) --method DELETE --path '/calendars/{calendarId}/events/{eventId}' --status 204 --body '{}' --thenFile ${thenFile}",
             "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path /freeBusy --status 200 --body value(freeBusyBody)",
-            "rm -f ${thenFile}"
+            "rm -f ${thenFile}",
+            "rm -f ${patchBodyFile}"
           ],
           "help": {
             "text": "Register the Google Calendar API on a running mock: calendarList, the events collection and item (GET/POST/PATCH/DELETE), quickAdd, and freeBusy. A create/update/delete also reprograms the GET endpoints so a later read reflects it (create -> appears in GET by id; update -> GET reflects the new start/end/summary; delete -> GET 404s and drops out of the list). Run `mock preset google auth` first for credentials",
