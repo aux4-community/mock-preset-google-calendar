@@ -1,7 +1,7 @@
 {
   "scope": "community",
   "name": "mock-preset-google-calendar",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Google Calendar preset for aux4/mock (calendar list, events CRUD, quickAdd, freeBusy)",
   "license": "Apache-2.0",
   "tags": [
@@ -13,7 +13,7 @@
     "test"
   ],
   "dependencies": [
-    "aux4/mock",
+    "aux4/mock@>=0.1.0",
     "community/mock-preset-google-auth"
   ],
   "profiles": [
@@ -67,15 +67,21 @@
           "execute": [
             "aux4 mock stub param(port) param(name) param(stateDir) --method GET --path /users/me/calendarList --status 200 --body value(calendarListBody)",
             "aux4 mock stub param(port) param(name) param(stateDir) --method GET --path '/calendars/{calendarId}/events' --status 200 --body value(eventsBody)",
-            "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path '/calendars/{calendarId}/events' --status 200 --body value(eventBody)",
+            "file:${thenFile}:${createThenBody}",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path '/calendars/{calendarId}/events' --status 200 --body value(eventBody) --thenFile ${thenFile}",
             "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path '/calendars/{calendarId}/events/quickAdd' --status 200 --body value(eventBody)",
             "aux4 mock stub param(port) param(name) param(stateDir) --method GET --path '/calendars/{calendarId}/events/{eventId}' --status 200 --body value(eventBody)",
-            "aux4 mock stub param(port) param(name) param(stateDir) --method PATCH --path '/calendars/{calendarId}/events/{eventId}' --status 200 --body value(eventBody)",
-            "aux4 mock stub param(port) param(name) param(stateDir) --method DELETE --path '/calendars/{calendarId}/events/{eventId}' --status 204 --body '{}'",
-            "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path /freeBusy --status 200 --body value(freeBusyBody)"
+            "file:${thenFile}:${patchThenBody}",
+            "file:${patchBodyFile}:${patchResponseBody}",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method PATCH --path '/calendars/{calendarId}/events/{eventId}' --status 200 --bodyFile ${patchBodyFile} --thenFile ${thenFile}",
+            "file:${thenFile}:${deleteThenBody}",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method DELETE --path '/calendars/{calendarId}/events/{eventId}' --status 204 --body '{}' --thenFile ${thenFile}",
+            "aux4 mock stub param(port) param(name) param(stateDir) --method POST --path /freeBusy --status 200 --body value(freeBusyBody)",
+            "rm -f ${thenFile}",
+            "rm -f ${patchBodyFile}"
           ],
           "help": {
-            "text": "Register the Google Calendar API on a running mock: calendarList, the events collection and item (GET/POST/PATCH/DELETE), quickAdd, and freeBusy. Run `mock preset google auth` first for credentials",
+            "text": "Register the Google Calendar API on a running mock: calendarList, the events collection and item (GET/POST/PATCH/DELETE), quickAdd, and freeBusy. A create/update/delete also reprograms the GET endpoints so a later read reflects it (create -> appears in GET by id; update -> GET reflects the new start/end/summary; delete -> GET 404s and drops out of the list). Run `mock preset google auth` first for credentials",
             "variables": [
               {
                 "name": "port",
@@ -91,6 +97,11 @@
                 "name": "stateDir",
                 "text": "Explicit state directory (highest precedence)",
                 "default": ""
+              },
+              {
+                "name": "thenFile",
+                "text": "Internal scratch file this command writes and reuses to pass --thenFile JSON to aux4/mock (the JSON references ${path.*}/${body.*}, whose names collide with this command's own --path/--body flags, so it must travel through a file rather than inline --then). Removed when the command finishes",
+                "default": ".mock-preset-google-calendar-then-${port}${name}.json"
               },
               {
                 "name": "calendar",
@@ -141,6 +152,31 @@
                 "name": "freeBusyBody",
                 "text": "freeBusy response body (derived from --calendarId/--start/--end)",
                 "default": "{\"kind\":\"calendar#freeBusy\",\"calendars\":{\"${calendarId}\":{\"busy\":[{\"start\":\"${start}\",\"end\":\"${end}\"}]}}}"
+              },
+              {
+                "name": "deleteThenBody",
+                "text": "aux4/mock --then for a delete: makes a later GET of that event 404 and drops it from the events list",
+                "default": "[{\"method\":\"GET\",\"path\":\"/calendars/${path.calendarId}/events/${path.eventId}\",\"status\":404,\"body\":\"{\\\"error\\\":{\\\"errors\\\":[{\\\"domain\\\":\\\"global\\\",\\\"reason\\\":\\\"notFound\\\",\\\"message\\\":\\\"Not Found\\\"}],\\\"code\\\":404,\\\"message\\\":\\\"Not Found\\\"}}\"},{\"method\":\"GET\",\"path\":\"/calendars/${path.calendarId}/events\",\"status\":200,\"body\":\"{\\\"kind\\\":\\\"calendar#events\\\",\\\"summary\\\":\\\"${calendar}\\\",\\\"items\\\":[]}\"}]"
+              },
+              {
+                "name": "patchThenBody",
+                "text": "aux4/mock --then for an update: makes a later GET of that event (and the list) reflect the patched start/end/summary. A field the PATCH did not send keeps its preset value (via the mock's ${body.x:-default} fallback)",
+                "default": "[{\"method\": \"GET\", \"path\": \"/calendars/${path.calendarId}/events/${path.eventId}\", \"status\": 200, \"body\": \"{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${path.eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary:-${event}}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime:-${start}}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime:-${end}}\\\"}}\"}, {\"method\": \"GET\", \"path\": \"/calendars/${path.calendarId}/events\", \"status\": 200, \"body\": \"{\\\"kind\\\":\\\"calendar#events\\\",\\\"summary\\\":\\\"${calendar}\\\",\\\"items\\\":[{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${path.eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary:-${event}}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime:-${start}}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime:-${end}}\\\"}}]}\"}]"
+              },
+              {
+                "name": "createThenBody",
+                "text": "aux4/mock --then for a create: makes a later GET by the fixed --eventId return the created event's summary/start/end. A field the create request did not send resolves to an empty string",
+                "default": "[{\"method\":\"GET\",\"path\":\"/calendars/${path.calendarId}/events/${eventId}\",\"status\":200,\"body\":\"{\\\"kind\\\":\\\"calendar#event\\\",\\\"id\\\":\\\"${eventId}\\\",\\\"status\\\":\\\"confirmed\\\",\\\"summary\\\":\\\"${body.summary}\\\",\\\"start\\\":{\\\"dateTime\\\":\\\"${body.start.dateTime}\\\"},\\\"end\\\":{\\\"dateTime\\\":\\\"${body.end.dateTime}\\\"}}\"}]"
+              },
+              {
+                "name": "patchResponseBody",
+                "text": "Body returned by PATCH/PUT of an event: the event with the sent fields applied (fields not sent keep their preset values).",
+                "default": "{\"kind\":\"calendar#event\",\"id\":\"${path.eventId}\",\"status\":\"confirmed\",\"summary\":\"${body.summary:-${event}}\",\"start\":{\"dateTime\":\"${body.start.dateTime:-${start}}\"},\"end\":{\"dateTime\":\"${body.end.dateTime:-${end}}\"}}"
+              },
+              {
+                "name": "patchBodyFile",
+                "text": "Scratch file the PATCH response template is written to.",
+                "default": ".mock-preset-google-calendar-patch-${port}${name}.json"
               }
             ]
           }

@@ -187,6 +187,85 @@ curl -s http://localhost:18902/api/calendars/primary/events
 {"kind":"calendar#events","summary":"Sally","items":[]}
 ```
 
+## stateful effects: GET reflects an earlier create/update/delete
+
+### should re-apply a fresh preset
+
+```execute
+aux4 mock reset --port 18902 --stubs true
+aux4 mock preset google calendar --port 18902
+```
+
+```expect:partial
+stub DELETE /calendars/{calendarId}/events/{eventId} -> 204
+```
+
+### should return the original event before any mutation
+
+```execute
+curl -s http://localhost:18902/api/calendars/primary/events/evt1
+```
+
+```expect
+{"kind":"calendar#event","id":"evt1","status":"confirmed","summary":"Team sync","start":{"dateTime":"2026-01-15T09:00:00Z"},"end":{"dateTime":"2026-01-15T10:00:00Z"}}
+```
+
+### should reflect a reschedule on the same event
+
+```execute
+curl -s -X PATCH http://localhost:18902/api/calendars/primary/events/evt1 -H 'Content-Type: application/json' -d '{"summary":"Team sync (rescheduled)","start":{"dateTime":"2026-01-16T11:00:00Z"},"end":{"dateTime":"2026-01-16T12:00:00Z"}}'
+curl -s http://localhost:18902/api/calendars/primary/events/evt1
+```
+
+```expect:partial
+{"kind":"calendar#event","id":"evt1","status":"confirmed","summary":"Team sync (rescheduled)","start":{"dateTime":"2026-01-16T11:00:00Z"},"end":{"dateTime":"2026-01-16T12:00:00Z"}}
+```
+
+### should reflect the reschedule in the events list too
+
+```execute
+curl -s http://localhost:18902/api/calendars/primary/events
+```
+
+```expect:partial
+"summary":"Team sync (rescheduled)"
+```
+
+### should 404 a deleted event and drop it from the list
+
+```execute
+curl -s -o /dev/null -X DELETE http://localhost:18902/api/calendars/primary/events/evt1
+curl -s -w "\n%{http_code}" http://localhost:18902/api/calendars/primary/events/evt1
+```
+
+```expect
+{"error":{"errors":[{"domain":"global","reason":"notFound","message":"Not Found"}],"code":404,"message":"Not Found"}}
+404
+```
+
+### should return an empty list after the delete
+
+```execute
+curl -s http://localhost:18902/api/calendars/primary/events
+```
+
+```expect
+{"kind":"calendar#events","summary":"Sally","items":[]}
+```
+
+### should make a newly created event retrievable by the fixed event id
+
+```execute
+aux4 mock reset --port 18902 --stubs true
+aux4 mock preset google calendar --port 18902
+curl -s -X POST http://localhost:18902/api/calendars/primary/events -H 'Content-Type: application/json' -d '{"summary":"New Event","start":{"dateTime":"2026-02-01T08:00:00Z"},"end":{"dateTime":"2026-02-01T09:00:00Z"}}'
+curl -s http://localhost:18902/api/calendars/primary/events/evt1
+```
+
+```expect:partial
+{"kind":"calendar#event","id":"evt1","status":"confirmed","summary":"New Event","start":{"dateTime":"2026-02-01T08:00:00Z"},"end":{"dateTime":"2026-02-01T09:00:00Z"}}
+```
+
 ## layering: an error path over the preset
 
 ### should apply the preset then override one endpoint
