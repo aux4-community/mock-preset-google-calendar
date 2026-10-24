@@ -13,7 +13,7 @@
     "test"
   ],
   "dependencies": [
-    "aux4/mock",
+    "aux4/mock@>=0.1.0",
     "community/mock-preset-google-auth"
   ],
   "profiles": [
